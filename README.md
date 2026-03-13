@@ -17,10 +17,8 @@ python3 -m pip install pygame numpy
 ```
 
 ## Run the game
-From this folder:
 
 ```bash
-cd "/Users/f1fty28ty/School/5120/HW2"
 python3 large_board_tic_tac_toe.py
 ```
 
