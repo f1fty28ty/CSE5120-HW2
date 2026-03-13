@@ -23,7 +23,7 @@ Turn encoding (matches `get_new_state`):
 class GameStatus:
 
 
-    def __init__(self, board_state, turn_O):
+    def __init__(self, board_state, turn_O, win_length=3):
         """
         Create a new game state snapshot.
 
@@ -32,11 +32,14 @@ class GameStatus:
             turn_O: Boolean that determines what value will be placed next:
                 - True  -> place X (1)
                 - False -> place O (-1)
+            win_length: Number of consecutive marks needed to win.
+                        Defaults to 3; use 4 for 4x4 boards, 5 for 5x5 boards.
         """
 
         self.board_state = board_state
         self.turn_O = turn_O
         self.oldScores = 0
+        self.win_length = win_length
 
         self.winner = ""
     """
@@ -49,13 +52,13 @@ class GameStatus:
         Check if the state is terminal (game over) and set `self.winner`.
 
         Current behavior:
-- The game ends immediately if a 3-in-a-row exists for either player.
+- The game ends immediately if a win_length-in-a-row exists for either player.
 - Otherwise, the game ends in a draw when the board is full.
 
         Returns:
             True if the game has ended, otherwise False.
         """
-        # Early win condition: any completed 3-in-a-row makes the game end immediately.
+        # Early win condition: any completed win_length-in-a-row makes the game end immediately.
         final_score = self.get_scores(terminal=True)
         if final_score > 0:
             self.winner = "X"
@@ -96,13 +99,14 @@ class GameStatus:
         - +1 for each X group found
         - -1 for each O group found
 
-        If `terminal` is True, groups are length 3 (true 3-in-a-row).
-        If `terminal` is False, groups are length 2 (heuristic for search).
+        If `terminal` is True, groups are length win_length (true win condition).
+        If `terminal` is False, groups are length win_length-1 (heuristic for search).
         """
         rows = len(self.board_state)
         cols = len(self.board_state[0])
         scores = 0
-        check_point = 3 if terminal else 2
+        # Terminal check uses full win_length; heuristic uses win_length-1
+        check_point = self.win_length if terminal else self.win_length - 1
 
         directions = [(0, 1), (1, 0), (1, 1), (1, -1)]
         for r in range(rows):
@@ -141,7 +145,7 @@ class GameStatus:
         rows = len(self.board_state)
         cols = len(self.board_state[0])
         scores = 0
-        check_point = 3 if terminal else 2
+        check_point = self.win_length if terminal else self.win_length - 1
 
         directions = [(0, 1), (1, 0), (1, 1), (1, -1)]
         for r in range(rows):
@@ -188,10 +192,10 @@ class GameStatus:
         Return a NEW GameStatus after applying the given move.
 
         This function does not mutate the current object. It copies the board, applies
-        the next player's value, and flips `turn_O`.
+        the next player's value, and flips `turn_O`. win_length is preserved.
         """
         new_board_state = self.board_state.copy()
         x, y = move[0], move[1]
         # Apply the current player's mark, then toggle to the other player.
         new_board_state[x, y] = 1 if self.turn_O else -1
-        return GameStatus(new_board_state, not self.turn_O)
+        return GameStatus(new_board_state, not self.turn_O, self.win_length)
