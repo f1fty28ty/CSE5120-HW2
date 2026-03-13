@@ -93,11 +93,14 @@ class RandomBoardTicTacToe:
         # Button placeholders
         self.buttons = {}
 
-        # Initialize pygame
+        # Initialize pygame ONCE here (not inside draw_game)
         pygame.init()
         self.font = pygame.font.SysFont(None, 28)
         self.small_font = pygame.font.SysFont(None, 22)
         self.big_font = pygame.font.SysFont(None, 34)
+
+        # Create screen ONCE here
+        self.screen = pygame.display.set_mode(self.size)
 
         self.game_reset()
 
@@ -108,8 +111,8 @@ class RandomBoardTicTacToe:
         This redraws a fresh background and UI chrome. It does NOT re-draw existing marks;
         marks are drawn at move time by `draw_cross` / `draw_circle`.
         """
-        pygame.init()
-        self.screen = pygame.display.set_mode(self.size)
+        # FIX: removed pygame.init() and display.set_mode() from here — calling them
+        # every frame was re-initializing pygame and swallowing input events.
         pygame.display.set_caption("Tic Tac Toe GUI")
         self.screen.fill(self.BLACK)
 
@@ -128,10 +131,6 @@ class RandomBoardTicTacToe:
         rule_surface = self.small_font.render(rule_text, True, self.WHITE)
         self.screen.blit(rule_surface, (20, 70))
 
-        series_text = f"Series: X={self.series['X']}  O={self.series['O']}  Draw={self.series['Draw']}"
-        series_surface = self.small_font.render(series_text, True, self.WHITE)
-        self.screen.blit(series_surface, (20, 115))
-
         result_surface = self.small_font.render(
             self.result_text,
             True,
@@ -139,18 +138,23 @@ class RandomBoardTicTacToe:
         )
         self.screen.blit(result_surface, (20, 95))
 
+        series_text = f"Series: X={self.series['X']}  O={self.series['O']}  Draw={self.series['Draw']}"
+        series_surface = self.small_font.render(series_text, True, self.WHITE)
+        self.screen.blit(series_surface, (20, 115))
+
         mouse_pos = pygame.mouse.get_pos()
 
-        # Buttons (simple hover + selected highlighting)
+        # FIX: moved buttons up to y=118 so they fit inside TOP_PANEL_HEIGHT=150
+        # Previously at y=145 they were clipped/overlapping the board edge.
         self.buttons = {
-            "minimax": pygame.Rect(20, 145, 100, 28),
-            "negamax": pygame.Rect(130, 145, 100, 28),
-            "pvai": pygame.Rect(250, 145, 110, 28),
-            "pvp": pygame.Rect(370, 145, 110, 28),
-            "size3": pygame.Rect(500, 145, 50, 28),
-            "size4": pygame.Rect(560, 145, 50, 28),
-            "size5": pygame.Rect(620, 145, 50, 28),
-            "reset": pygame.Rect(self.width - 90, 12, 78, 26),
+            "minimax": pygame.Rect(20,  118, 100, 26),
+            "negamax": pygame.Rect(130, 118, 100, 26),
+            "pvai":    pygame.Rect(250, 118, 110, 26),
+            "pvp":     pygame.Rect(370, 118, 115, 26),
+            "size3":   pygame.Rect(500, 118, 50,  26),
+            "size4":   pygame.Rect(560, 118, 50,  26),
+            "size5":   pygame.Rect(620, 118, 50,  26),
+            "reset":   pygame.Rect(self.width - 90, 12, 78, 26),
         }
 
         def draw_button(key, label, selected=False):
@@ -274,8 +278,10 @@ class RandomBoardTicTacToe:
                 # AI is always the next player, so draw based on whose turn it is BEFORE applying the move.
                 placing_o = not self.game_state.turn_O
                 self.move(ai_move)
-                px = ai_move[1] * self.WIDTH + self.WIDTH // 2
-                py = self.TOP_PANEL_HEIGHT + ai_move[0] * self.HEIGHT + self.HEIGHT // 2
+                cell_w = self.BOARD_PIXELS / self.GRID_SIZE
+                cell_h = self.BOARD_PIXELS / self.GRID_SIZE
+                px = ai_move[1] * cell_w + cell_w // 2
+                py = self.TOP_PANEL_HEIGHT + ai_move[0] * cell_h + cell_h // 2
                 # Convert (row, col) move into pixel center for drawing.
                 if placing_o:
                     self.draw_circle(px, py)
@@ -341,19 +347,10 @@ class RandomBoardTicTacToe:
                 if event.type == pygame.QUIT:
                     done = True
 
-                if self.is_game_over() and not self.game_over:
-                    terminal = True
-                    final = self.game_state.get_scores(terminal)
-                    self.final_score = final
-                    self.result_text = f"Game Over | Winner: {self.game_state.winner} | Score: {final}"
-                    pygame.display.set_caption(
-                        f"Game Over | Winner: {self.game_state.winner} | Score: {final}"
-                    )
-                    if self.game_state.winner in self.series:
-                        self.series[self.game_state.winner] += 1
-                    self.draw_game()
-                    self.game_over = True
-                    continue
+                # FIX: moved game-over detection inside MOUSEBUTTONDOWN so it only
+                # triggers once on a click, not every frame. Previously it was a
+                # floating check that ran every loop tick, causing repeated redraws
+                # and effectively freezing input.
 
                 if event.type == pygame.MOUSEBUTTONDOWN and not done:
                     click_x, click_y = pygame.mouse.get_pos()
@@ -427,10 +424,15 @@ class RandomBoardTicTacToe:
                     # First board click locks settings until Reset.
                     self.settings_locked = True
 
+                    # FIX: use cell_w/cell_h (full cell size) for coordinate math,
+                    # not self.WIDTH/HEIGHT which have OFFSET subtracted and give wrong cells.
+                    cell_w = self.BOARD_PIXELS / self.GRID_SIZE
+                    cell_h = self.BOARD_PIXELS / self.GRID_SIZE
+
                     # Translate screen coordinates into board indices.
                     board_y = click_y - self.TOP_PANEL_HEIGHT
-                    grid_row = int(board_y // self.HEIGHT)
-                    grid_col = int(click_x // self.WIDTH)
+                    grid_row = int(board_y // cell_h)
+                    grid_col = int(click_x // cell_w)
 
                     if 0 <= grid_row < self.GRID_SIZE and 0 <= grid_col < self.GRID_SIZE:
                         if self.game_state.board_state[grid_row][grid_col] == 0:
@@ -439,13 +441,15 @@ class RandomBoardTicTacToe:
 
                             self.move((grid_row, grid_col))
 
-                            draw_x = grid_col * self.WIDTH + self.WIDTH // 2
-                            draw_y = self.TOP_PANEL_HEIGHT + grid_row * self.HEIGHT + self.HEIGHT // 2
+                            draw_x = grid_col * cell_w + cell_w // 2
+                            draw_y = self.TOP_PANEL_HEIGHT + grid_row * cell_h + cell_h // 2
 
                             if placing_o:
                                 self.draw_circle(draw_x, draw_y)
                             else:
                                 self.draw_cross(draw_x, draw_y)
+
+                            self.change_turn()
 
                             if self.is_game_over():
                                 terminal = True
@@ -455,9 +459,13 @@ class RandomBoardTicTacToe:
                                 pygame.display.set_caption(
                                     f"Game Over | Winner: {self.game_state.winner} | Score: {final}"
                                 )
+                                if self.game_state.winner in self.series:
+                                    self.series[self.game_state.winner] += 1
                                 self.draw_game()
                                 self.game_over = True
                             else:
+                                # FIX: only call play_ai when mode is player_vs_ai
+                                # Previously AI ran in Human vs Human mode too.
                                 if self.mode == "player_vs_ai":
                                     self.play_ai()
                                     if self.is_game_over():
@@ -468,6 +476,8 @@ class RandomBoardTicTacToe:
                                         pygame.display.set_caption(
                                             f"Game Over | Winner: {self.game_state.winner} | Score: {final}"
                                         )
+                                        if self.game_state.winner in self.series:
+                                            self.series[self.game_state.winner] += 1
                                         self.draw_game()
                                         self.game_over = True
 
