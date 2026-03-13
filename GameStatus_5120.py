@@ -1,10 +1,38 @@
 # -*- coding: utf-8 -*-
 
 import numpy as np
+
+"""
+GameStatus_5120.py
+
+This file defines the `GameStatus` class, which represents the current board and turn.
+It is used by:
+- The GUI (to apply moves and detect game-over)
+- The search agents (minimax/negamax) to evaluate states and generate legal moves
+
+Board encoding:
+- 0  : empty
+- 1  : X
+- -1 : O
+
+Turn encoding (matches `get_new_state`):
+- If `turn_O` is True  -> the next move written is X (1)
+- If `turn_O` is False -> the next move written is O (-1)
+"""
+
 class GameStatus:
 
 
     def __init__(self, board_state, turn_O):
+        """
+        Create a new game state snapshot.
+
+        Args:
+            board_state: NumPy 2D array containing values in {0, 1, -1}.
+            turn_O: Boolean that determines what value will be placed next:
+                - True  -> place X (1)
+                - False -> place O (-1)
+        """
 
         self.board_state = board_state
         self.turn_O = turn_O
@@ -17,6 +45,17 @@ class GameStatus:
         """
 
     def is_terminal(self):
+        """
+        Check if the state is terminal (game over) and set `self.winner`.
+
+        Current behavior:
+- The game ends immediately if a 3-in-a-row exists for either player.
+- Otherwise, the game ends in a draw when the board is full.
+
+        Returns:
+            True if the game has ended, otherwise False.
+        """
+        # Early win condition: any completed 3-in-a-row makes the game end immediately.
         final_score = self.get_scores(terminal=True)
         if final_score > 0:
             self.winner = "X"
@@ -25,6 +64,7 @@ class GameStatus:
             self.winner = "O"
             return True
 
+        # No winner yet: only end if there are no empty cells left.
         empty_cells = 0
         for r in range(len(self.board_state)):
             for c in range(len(self.board_state[r])):
@@ -49,6 +89,16 @@ class GameStatus:
         NEGATIVE (AI PLAYER WINS), OR 0 (DRAW)
         
         """        
+        """
+        Compute an evaluation score for the current board.
+
+        Scoring:
+        - +1 for each X group found
+        - -1 for each O group found
+
+        If `terminal` is True, groups are length 3 (true 3-in-a-row).
+        If `terminal` is False, groups are length 2 (heuristic for search).
+        """
         rows = len(self.board_state)
         cols = len(self.board_state[0])
         scores = 0
@@ -59,14 +109,16 @@ class GameStatus:
             for c in range(cols):
                 for dr, dc in directions:
                     segment = []
-                    for step in range(3):
+                    # Build a run of length `check_point` starting at (r, c) in direction (dr, dc).
+                    for step in range(check_point):
                         nr, nc = r + dr * step, c + dc * step
                         if 0 <= nr < rows and 0 <= nc < cols:
                             segment.append(self.board_state[nr][nc])
-                    if len(segment) == 3:
-                        if segment[0] == segment[1] == segment[2] == 1:
+                    if len(segment) == check_point:
+                        # Count uniform segments only (all X or all O).
+                        if all(v == 1 for v in segment):
                             scores += 1
-                        elif segment[0] == segment[1] == segment[2] == -1:
+                        elif all(v == -1 for v in segment):
                             scores -= 1
 
         return scores
@@ -78,6 +130,14 @@ class GameStatus:
                                                                                FOR HUMAN PLAYER INSTEAD OF 
                                                                                SCORES = SCORES + 1)
         """
+        """
+        Compute a negamax evaluation score.
+
+        Differences from `get_scores()`:
+        - Uses larger magnitude (+100 / -100) so the search prioritizes strong patterns.
+        - Applies a turn-based sign adjustment at the end so the base case of `negamax`
+          can return a value aligned with the current player-to-move.
+        """
         rows = len(self.board_state)
         cols = len(self.board_state[0])
         scores = 0
@@ -88,16 +148,18 @@ class GameStatus:
             for c in range(cols):
                 for dr, dc in directions:
                     segment = []
-                    for step in range(3):
+                    # Same scan as `get_scores()`, but with a larger magnitude per segment.
+                    for step in range(check_point):
                         nr, nc = r + dr * step, c + dc * step
                         if 0 <= nr < rows and 0 <= nc < cols:
                             segment.append(self.board_state[nr][nc])
-                    if len(segment) == 3:
-                        if segment[0] == segment[1] == segment[2] == 1:
+                    if len(segment) == check_point:
+                        if all(v == 1 for v in segment):
                             scores += 100
-                        elif segment[0] == segment[1] == segment[2] == -1:
+                        elif all(v == -1 for v in segment):
                             scores -= 100
 
+        # Perspective adjustment: return a score aligned to the player-to-move.
         return scores * (-1 if self.turn_O else 1)
 
     def get_moves(self):
@@ -105,6 +167,12 @@ class GameStatus:
         """
         YOUR CODE HERE TO ADD ALL THE NON EMPTY CELLS TO MOVES VARIABLES AND RETURN IT TO BE USE BY YOUR
         MINIMAX OR NEGAMAX FUNCTIONS
+        """
+        """
+        Return a list of all legal moves (empty cells).
+
+        Returns:
+            List of (row, col) tuples.
         """
         num_rows = self.board_state.shape[0]
         num_cols = self.board_state.shape[1]
@@ -116,7 +184,14 @@ class GameStatus:
 
 
     def get_new_state(self, move):
+        """
+        Return a NEW GameStatus after applying the given move.
+
+        This function does not mutate the current object. It copies the board, applies
+        the next player's value, and flips `turn_O`.
+        """
         new_board_state = self.board_state.copy()
         x, y = move[0], move[1]
-        new_board_state[x,y] = 1 if self.turn_O else -1
+        # Apply the current player's mark, then toggle to the other player.
+        new_board_state[x, y] = 1 if self.turn_O else -1
         return GameStatus(new_board_state, not self.turn_O)
