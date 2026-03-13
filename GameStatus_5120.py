@@ -58,28 +58,46 @@ class GameStatus:
         Returns:
             True if the game has ended, otherwise False.
         """
-        # Early win condition: any completed win_length-in-a-row makes the game end immediately.
-        final_score = self.get_scores(terminal=True)
-        if final_score > 0:
-            self.winner = "X"
-            return True
-        elif final_score < 0:
-            self.winner = "O"
-            return True
+        """
+        For 3x3, normal tic-tac toe behavior is used.
+        For larger boards, the game ends when the board is full 
+        & the winner is decided by the cumulative triplet score
+        """
+        rows = len(self.board_state)
+        cols = len(self.board_state[0])
 
-        # No winner yet: only end if there are no empty cells left.
-        empty_cells = 0
-        for r in range(len(self.board_state)):
-            for c in range(len(self.board_state[r])):
-                if self.board_state[r][c] == 0:
-                    empty_cells += 1
-        if empty_cells == 0:
+        # Standard 3x3 behavior can be kept
+        if rows == 3 and cols ==3:
+            final_score = self.get_scores(True)
+
+            if final_score > 0:
+                self.winner = "X"
+                return True
+            elif final_score < 0:
+                self.winner = "O"
+                return True
+            
+            for r in range(rows):
+                for c in range(cols):
+                    if self.board_state[r][c] == 0:
+                        return False
+                    
             self.winner = "Draw"
             return True
-    
-        return False
+        # For larger boards, logic is to keep playing until the board is full
+        for r in range(rows):
+            for c in range(cols):
+                if self.board_state[r][c] == 0:
+                    return False
+        final_score = self.get_scores(True)
 
-        
+        if final_score > 0:
+            self.winner = "X"
+        elif final_score < 0:
+            self.winner = "O"
+        else:
+            self.winner = "Draw"
+        return True
         
 
     def get_scores(self, terminal):
@@ -96,17 +114,17 @@ class GameStatus:
         Compute an evaluation score for the current board.
 
         Scoring:
-        - +1 for each X group found
-        - -1 for each O group found
+        - +1 for each X triplet found
+        - -1 for each O triplet found
 
-        If `terminal` is True, groups are length win_length (true win condition).
-        If `terminal` is False, groups are length win_length-1 (heuristic for search).
+        For this HW, larger-board scoring is based on matching triplets measured cumulatively across the board.
+
         """
         rows = len(self.board_state)
         cols = len(self.board_state[0])
         scores = 0
         # Terminal check uses full win_length; heuristic uses win_length-1
-        check_point = self.win_length if terminal else self.win_length - 1
+        check_point = 3
 
         directions = [(0, 1), (1, 0), (1, 1), (1, -1)]
         for r in range(rows):
@@ -118,6 +136,7 @@ class GameStatus:
                         nr, nc = r + dr * step, c + dc * step
                         if 0 <= nr < rows and 0 <= nc < cols:
                             segment.append(self.board_state[nr][nc])
+
                     if len(segment) == check_point:
                         # Count uniform segments only (all X or all O).
                         if all(v == 1 for v in segment):
@@ -137,15 +156,14 @@ class GameStatus:
         """
         Compute a negamax evaluation score.
 
-        Differences from `get_scores()`:
-        - Uses larger magnitude (+100 / -100) so the search prioritizes strong patterns.
-        - Applies a turn-based sign adjustment at the end so the base case of `negamax`
-          can return a value aligned with the current player-to-move.
+        follows the same triplet-based board logic as 'get_scores()',
+        but uses a larger score magnitude for search.
         """
         rows = len(self.board_state)
         cols = len(self.board_state[0])
         scores = 0
-        check_point = self.win_length if terminal else self.win_length - 1
+        # keep negamax aligned with the same triplet-based scoring rule
+        check_point = 3
 
         directions = [(0, 1), (1, 0), (1, 1), (1, -1)]
         for r in range(rows):

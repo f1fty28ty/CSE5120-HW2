@@ -73,7 +73,7 @@ class RandomBoardTicTacToe:
         # Grid Size
         self.GRID_SIZE = 4
         self.OFFSET = 5
-        self.win_length = 4  # scales with board: 3→3, 4→4, 5→5
+        self.win_length = 4  # kept for board setup /compatibility; larger-board scoring is handled in GameStatus
 
         # This sets the WIDTH and HEIGHT of each grid location
         self.WIDTH = self.BOARD_PIXELS / self.GRID_SIZE - self.OFFSET
@@ -128,8 +128,12 @@ class RandomBoardTicTacToe:
         info_surface = self.small_font.render(info_text, True, self.WHITE)
         self.screen.blit(info_surface, (20, 45))
 
-        # Rule text updates to match the current board's win condition
-        rule_text = f"Rule: First {self.win_length}-in-a-row ends the game."
+        # Rule text should match the actual game logic
+        if self.GRID_SIZE == 3:
+            rule_text = "Rule: First 3-in-a-row wins."
+        else:
+            rule_text = "Rule: Board fills completely; winner is based on total matching triplets."
+        
         rule_surface = self.small_font.render(rule_text, True, self.WHITE)
         self.screen.blit(rule_surface, (20, 70))
 
