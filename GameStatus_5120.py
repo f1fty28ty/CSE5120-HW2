@@ -181,8 +181,8 @@ class GameStatus:
                         elif all(v == -1 for v in segment):
                             scores -= 100
 
-        # Perspective adjustment: return a score aligned to the player-to-move.
-        return scores * (-1 if self.turn_O else 1)
+        # Fixed: Flipped values
+        return scores * (1 if self.turn_O else -1)
 
     def get_moves(self):
         moves = []
