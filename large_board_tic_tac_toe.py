@@ -292,7 +292,7 @@ class RandomBoardTicTacToe:
         """
         if self.mode == "player_vs_ai":
             # Scale depth down for larger boards to keep search time reasonable
-            depth = 3 if self.GRID_SIZE == 3 else (2 if self.GRID_SIZE == 4 else 1)
+            depth = 9 if self.GRID_SIZE == 3 else (2 if self.GRID_SIZE == 4 else 1)
             if self.algorithm == "negamax":
                 # negamax base case already handles perspective in GameStatus.get_negamax_scores()
                 _, ai_move = negamax(self.game_state, depth, 1)
